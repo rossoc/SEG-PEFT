@@ -59,10 +59,7 @@ def compute_metrics(eval_pred):
         return {
             "mean_iou": float(results["mean_iou"]),
             "mean_dice": mean_dice,
-            "per_class_dice": dice_scores,
-            "mean_accuracy": float(results["mean_accuracy"]),
-            "overall_accuracy": float(results["overall_accuracy"]),
-            "per_class_iou": [float(x) for x in results["per_category_iou"]],
+            "accuracy": float(results["mean_accuracy"]),
         }
 
 
