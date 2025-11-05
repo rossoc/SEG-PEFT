@@ -1,0 +1,19 @@
+name: Python Formatter
+# It relies on `uv` therefore the project should rely on it
+
+on:
+  pull_request:
+  push:
+    branches-ignore: []
+    
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Check formatting with uv
+        run: uv format --check
