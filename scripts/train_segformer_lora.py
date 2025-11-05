@@ -45,15 +45,13 @@ def main(epochs, lr, r, lora_alpha, lora_dropout, save_dir):
         num_train_epochs=epochs,
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
-        save_steps=0,
-        eval_steps=len(train_dataset),
-        logging_steps=int(len(train_dataset) / 5),
+        save_steps=len(train_dataset),  # Evaluate every epoch
+        eval_steps=len(train_dataset),  # Evaluate every epoch
+        logging_steps=int(len(test_dataset) / 5),
         learning_rate=lr,
         save_total_limit=2,
-        prediction_loss_only=True,
+        prediction_loss_only=False,
         remove_unused_columns=True,
-        push_to_hub=False,
-        report_to=None,
         eval_strategy="steps",
         save_strategy="steps",
         load_best_model_at_end=True,
@@ -73,10 +71,12 @@ def main(epochs, lr, r, lora_alpha, lora_dropout, save_dir):
     trainer.train()
     end_time = time.time() - start_time
 
+    print("Evaluating final model...")
+    final_eval = trainer.evaluate()
     all_metrics = {
-        "training_history": trainer.state.log_history,
-        "final_evaluation": trainer.evaluate(),
+        "final_evaluation": final_eval,
         "training_time": end_time,
+        "training_history": trainer.state.log_history,
     }
 
     with open(f"./outputs/{save_dir}/all_metrics.json", "w") as f:
@@ -89,13 +89,13 @@ def main(epochs, lr, r, lora_alpha, lora_dropout, save_dir):
 
 if __name__ == "__main__":
     ap = ArgumentParser()
-    ap.add_argument("--epochs", default=30)
-    ap.add_argument("--lr", default=5e-5)
-    ap.add_argument("--rank", default=8)
-    ap.add_argument("--lora-alpha", default=32)
-    ap.add_argument("--lora-dropout", default=0.1)
-    ap.add_argument("--save-dir")
-    ap.add_argument("--seed", default=42)
+    ap.add_argument("--epochs", type=int, default=30)
+    ap.add_argument("--lr", type=float, default=5e-5)
+    ap.add_argument("--rank", type=int, default=8)
+    ap.add_argument("--lora-alpha", type=int, default=32)
+    ap.add_argument("--lora-dropout", type=float, default=0.1)
+    ap.add_argument("--save-dir", required=True)
+    ap.add_argument("--seed", type=int, default=42)
 
     args = ap.parse_args()
 

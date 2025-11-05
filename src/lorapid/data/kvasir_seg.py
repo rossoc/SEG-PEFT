@@ -17,7 +17,6 @@ class KvasirSegDataset(Dataset):
         self.images = sorted(os.listdir(image_dir))
         self.masks = sorted(os.listdir(mask_dir))
 
-        # Validate that images and masks match
         assert len(self.images) == len(self.masks)
         for img, mask in zip(self.images, self.masks):
             assert img == mask, f"Image {img} does not match mask {mask}"
@@ -38,30 +37,28 @@ class KvasirSegDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         mask = Image.open(mask_path).convert("L")
 
-        if self.transforms:
-            image_np = np.array(image)
-            mask_np = np.array(mask)
+        image_np = np.array(image)
+        mask_np = np.array(mask)
 
+        if self.transforms:
             augmented = self.transforms(image=image_np, mask=mask_np)
-            image_tensor = augmented["image"]
+            image_np = augmented["image"]
             mask_np = augmented["mask"]
         else:
-            image_np = np.array(image)
-            mask_np = np.array(mask)
-            image_tensor = torch.tensor(image_np).permute(2, 0, 1).float()
+            image_np = torch.tensor(image_np).permute(2, 0, 1).float()
+            mask_np = np.where(mask_np > 127, 1, 0)
 
-        inputs = self.feature_extractor(images=[image_tensor], return_tensors="pt")
-        pixel_values = inputs.pixel_values.squeeze()
+        inputs = self.feature_extractor(images=[image_np], return_tensors="pt")
+        pixel_values = inputs.pixel_values.squeeze(0)
 
-        mask = np.array(mask)
-        mask = np.where(mask > 127, 1, 0)
+        mask = np.where(mask_np > 127, 1, 0)
         mask = torch.from_numpy(mask).long()
 
         return {"pixel_values": pixel_values, "labels": mask}
 
 
-def kvasir_dataset(model_name, test_size):
-    data_dir = "data/Kvasir-SEG"
+def kvasir_dataset(model_name, test_size, notebook=False):
+    data_dir = "../data/Kvasir-SEG" if notebook else "data/Kvasir-SEG"
     image_dir = os.path.join(data_dir, "images")
     mask_dir = os.path.join(data_dir, "masks")
 

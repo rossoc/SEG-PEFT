@@ -9,8 +9,7 @@ import yaml
 import matplotlib.pyplot as plt
 from torch import nn
 import evaluate
-
-metric = evaluate.load("mean_iou")
+from sklearn.metrics import f1_score
 
 
 def set_seed(seed: int):
@@ -22,38 +21,51 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
+metric = evaluate.load("mean_iou")
+
+
 def compute_metrics(eval_pred):
     with torch.no_grad():
         logits, labels = eval_pred
-        # Handle logits and labels with proper dimensions
-        if len(logits.shape) == 4:  # [batch, num_classes, height, width]
-            logits_tensor = torch.from_numpy(logits)
-            # Interpolate to match label dimensions
-            if logits_tensor.shape[-2:] != labels.shape[-2:]:
-                logits_tensor = nn.functional.interpolate(
-                    logits_tensor,
-                    size=labels.shape[-2:],
-                    mode="bilinear",
-                    align_corners=False,
-                )
-            # Apply argmax to get predictions
-            logits_tensor = logits_tensor.argmax(dim=1)
-        else:  # logits are already [batch, height, width] after argmax
-            logits_tensor = (
-                torch.from_numpy(logits).argmax(dim=-1)
-                if logits.ndim == 3
-                else torch.from_numpy(logits)
-            )
 
-        pred_labels = logits_tensor.detach().cpu().numpy()
-        metrics = metric.compute(
-            predictions=pred_labels,
-            references=labels,
-            num_labels=2,
-            ignore_index=255,  # Use 255 as ignore_index as it's standard for segmentation
+        logits_tensor = torch.tensor(logits)
+        labels_tensor = torch.tensor(labels)
+
+        logits_tensor = nn.functional.interpolate(
+            logits_tensor,
+            size=labels_tensor.shape[-2:],
+            mode="bilinear",
+            align_corners=False,
         )
 
-        return metrics
+        pred_labels = logits_tensor.argmax(dim=1)
+
+        pred_flat = pred_labels.view(-1).cpu().numpy()
+        labels_flat = labels_tensor.view(-1).cpu().numpy()
+
+        num_classes = logits_tensor.shape[1]
+        dice_scores = []
+        for class_idx in range(num_classes):
+            pred_binary = (pred_flat == class_idx).astype(int)
+            labels_binary = (labels_flat == class_idx).astype(int)
+            dice_scores.append(float(f1_score(pred_binary, labels_binary)))
+
+        mean_dice = float(np.mean(dice_scores))
+        results = metric.compute(
+            predictions=pred_labels.int(),
+            references=labels_tensor.int(),
+            num_labels=2,
+            ignore_index=True,
+        )
+
+        return {
+            "mean_iou": float(results["mean_iou"]),
+            "mean_dice": mean_dice,
+            "per_class_dice": dice_scores,
+            "mean_accuracy": float(results["mean_accuracy"]),
+            "overall_accuracy": float(results["overall_accuracy"]),
+            "per_class_iou": [float(x) for x in results["per_category_iou"]],
+        }
 
 
 class Metrics:

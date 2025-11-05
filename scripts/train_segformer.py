@@ -29,15 +29,13 @@ def main(epochs, lr, save_dir):
         num_train_epochs=epochs,
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
-        save_steps=0,
+        save_steps=len(train_dataset),
         eval_steps=len(train_dataset),
         logging_steps=int(len(train_dataset) / 5),
         learning_rate=lr,
         save_total_limit=2,
-        prediction_loss_only=True,
+        prediction_loss_only=False,
         remove_unused_columns=True,
-        push_to_hub=False,
-        report_to=None,
         eval_strategy="steps",
         save_strategy="steps",
         load_best_model_at_end=True,
@@ -58,9 +56,9 @@ def main(epochs, lr, save_dir):
     end_time = time.time() - start_time
 
     all_metrics = {
-        "training_history": trainer.state.log_history,
         "final_evaluation": trainer.evaluate(),
         "training_time": end_time,
+        "training_history": trainer.state.log_history,
     }
 
     with open(f"./outputs/{save_dir}/all_metrics.json", "w") as f:
