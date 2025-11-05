@@ -44,6 +44,23 @@ During training, the images are preprocessed with the following augmentations:
 
 ## Scripts
 
+### Initialization
+
+Forst of all you must execute the following commmands to clone and install the
+dependencies:
+
+```sh
+git clone https://github.com/rossoc/LoRAPID
+cd LoRAPID
+pip install -r requirements
+```
+
+Furthermore, you may want to activate the environment:
+
+```sh
+source .venv/bin/activate
+```
+
 ### Training SegFormer without LoRA
 
 To train the SegFormer model without LoRA (full fine-tuning):

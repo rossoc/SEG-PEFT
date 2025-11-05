@@ -39,8 +39,12 @@ def compute_metrics(eval_pred):
             # Apply argmax to get predictions
             logits_tensor = logits_tensor.argmax(dim=1)
         else:  # logits are already [batch, height, width] after argmax
-            logits_tensor = torch.from_numpy(logits).argmax(dim=-1) if logits.ndim == 3 else torch.from_numpy(logits)
-        
+            logits_tensor = (
+                torch.from_numpy(logits).argmax(dim=-1)
+                if logits.ndim == 3
+                else torch.from_numpy(logits)
+            )
+
         pred_labels = logits_tensor.detach().cpu().numpy()
         metrics = metric.compute(
             predictions=pred_labels,
