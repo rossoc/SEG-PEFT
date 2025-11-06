@@ -22,7 +22,74 @@ def set_seed(seed: int):
 metric = evaluate.load("mean_iou")
 
 
-def compute_metrics(eval_pred):
+def compute_metrics_fn(model_name):
+    if "segformer" in model_name:
+        return metrics_segformer
+    elif "mask2former" in model_name:
+        return metrics_mask2former
+
+
+def metrics_mask2former(eval_pred):
+    """
+    Simplified metrics function for Mask2Former with Kvasir dataset.
+    Designed specifically for 2-class segmentation (background, polyp).
+    """
+    with torch.no_grad():
+        logits, labels = eval_pred
+
+        if isinstance(logits, np.ndarray):
+            logits_tensor = torch.tensor(logits)
+        else:
+            logits_tensor = logits
+
+        if isinstance(labels, np.ndarray):
+            labels_tensor = torch.tensor(labels)
+        else:
+            labels_tensor = labels
+
+        if logits_tensor.dim() == 4:
+            processed_logits = logits_tensor
+        elif logits_tensor.dim() == 5:
+            processed_logits = logits_tensor
+        else:
+            raise ValueError(f"Unexpected logits shape: {logits_tensor.shape}")
+
+        if processed_logits.shape[-2:] != labels_tensor.shape[-2:]:
+            processed_logits = nn.functional.interpolate(
+                processed_logits,
+                size=labels_tensor.shape[-2:],
+                mode="bilinear",
+                align_corners=False,
+            )
+
+        pred_labels = processed_logits.argmax(dim=1)
+        pred_flat = pred_labels.flatten().cpu().numpy()
+        labels_flat = labels_tensor.flatten().cpu().numpy()
+
+        dice_scores = []
+        for class_idx in [0, 1]:  # Kvasir has only 2 classes: background (0), polyp (1)
+            pred_binary = (pred_flat == class_idx).astype(int)
+            labels_binary = (labels_flat == class_idx).astype(int)
+            score = f1_score(labels_binary, pred_binary)
+            dice_scores.append(float(score))
+
+        mean_dice = float(np.mean(dice_scores)) if dice_scores else 0.0
+
+        mean_iou_result = metric.compute(
+            predictions=pred_labels.int(),
+            references=labels_tensor.int(),
+            num_labels=2,
+            ignore_index=255,
+        )
+
+        return {
+            "mean_iou": float(mean_iou_result["mean_iou"]),
+            "mean_dice": mean_dice,
+            "accuracy": float(mean_iou_result["mean_accuracy"]),
+        }
+
+
+def metrics_segformer(eval_pred):
     with torch.no_grad():
         logits, labels = eval_pred
 

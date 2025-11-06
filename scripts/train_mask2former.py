@@ -17,10 +17,8 @@ from transformers import (
 )
 from argparse import ArgumentParser
 from segpeft import kvasir_dataset, mask2former, set_seed, Metrics
-from segpeft.metrics import compute_metrics
+from segpeft.metrics import compute_metrics_fn
 import time
-import yaml
-import pandas as pd
 
 
 def main(epochs, lr, save_dir):
@@ -32,13 +30,14 @@ def main(epochs, lr, save_dir):
     test_size = 0.2
     model, model_name, _ = mask2former()
     train_dataset, test_dataset = kvasir_dataset(model_name, test_size)
-    N = 2
+    N = len(train_dataset)
+    batch_size = 64
 
     training_args = TrainingArguments(
         output_dir="./outputs/" + save_dir,
         num_train_epochs=epochs,
-        per_device_train_batch_size=1,
-        per_device_eval_batch_size=1,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
         logging_steps=N,
         learning_rate=lr,
         save_total_limit=2,
@@ -52,16 +51,12 @@ def main(epochs, lr, save_dir):
         logging_dir=f"./outputs/{save_dir}/logs",
     )
 
-    # Create a wrapper function that includes the model name
-    def compute_metrics_wrapper(eval_pred):
-        return compute_metrics(model_name, eval_pred)
-
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset[:1],
         eval_dataset=test_dataset[:1],
-        compute_metrics=compute_metrics_wrapper,  # type: ignore
+        compute_metrics=compute_metrics_fn(model_name),
         callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],
     )
 
@@ -70,17 +65,13 @@ def main(epochs, lr, save_dir):
     trainer.train()
     end_time = time.time() - start_time
 
+    final_test_metrics = trainer.evaluate(eval_dataset=train_dataset)
     log = trainer.state.log_history.copy()
-
-    # Evaluate on a very small subset to avoid memory issues
-    small_train_subset = train_dataset[:1]
-    final_train_metrics = trainer.evaluate(eval_dataset=small_train_subset)
+    final_train_metrics = trainer.evaluate(eval_dataset=train_dataset)
     log.append({"epoch": epochs, "loss": final_train_metrics["eval_loss"]})
     all_metrics = {
         "training_history": log,
-        "final_evaluation": trainer.evaluate(
-            eval_dataset=test_dataset[:1]
-        ),  # Small subset to avoid memory issues
+        "final_evaluation": final_test_metrics,
         "training_time": end_time,
     }
     metrics = Metrics(f"./outputs/{save_dir}/")

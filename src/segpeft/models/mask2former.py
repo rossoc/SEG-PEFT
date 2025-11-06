@@ -2,7 +2,7 @@ from transformers import Mask2FormerForUniversalSegmentation
 
 
 def mask2former():
-    model_name = "facebook/mask2former-swin-small-ade-semantic"
+    model_name = "facebook/mask2former-swin-small-coco-instance"
     model = Mask2FormerForUniversalSegmentation.from_pretrained(
         model_name,
         num_labels=2,
@@ -44,3 +44,7 @@ def mask2former():
         "dense",
     ]
     return model, model_name, modules
+
+
+# for name, param in model.named_parameters():
+#     print(name)

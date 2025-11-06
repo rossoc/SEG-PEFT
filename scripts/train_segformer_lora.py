@@ -7,7 +7,7 @@ This script trains a segmentation model to identify polyps in medical images.
 import torch
 from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from argparse import ArgumentParser
-from segpeft import kvasir_dataset, compute_metrics, segformer, set_seed, Metrics
+from segpeft import kvasir_dataset, compute_metrics_fn, segformer, set_seed, Metrics
 from peft import get_peft_model, LoraConfig
 import warnings
 import yaml
@@ -63,7 +63,7 @@ def main(epochs, lr, r, lora_alpha, lora_dropout, save_dir):
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
-        compute_metrics=compute_metrics,  # type: ignore
+        compute_metrics=compute_metrics_fn(model_name),  # type: ignore
         callbacks=[EarlyStoppingCallback(early_stopping_patience=N * 5)],
     )
 

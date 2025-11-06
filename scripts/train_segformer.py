@@ -11,7 +11,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 from argparse import ArgumentParser
-from segpeft import kvasir_dataset, compute_metrics, segformer, set_seed, Metrics
+from segpeft import kvasir_dataset, compute_metrics_fn, segformer, set_seed, Metrics
 import time
 import yaml
 import pandas as pd
@@ -51,7 +51,7 @@ def main(epochs, lr, save_dir):
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
-        compute_metrics=compute_metrics,  # type: ignore
+        compute_metrics=compute_metrics_fn(model_name),  # type: ignore
         callbacks=[EarlyStoppingCallback(early_stopping_patience=N * 5)],
     )
 
