@@ -4,6 +4,11 @@ Training script for SegFormer model on Kvasir-SEG dataset.
 This script trains a segmentation model to identify polyps in medical images.
 """
 
+import os
+
+# Set environment variable for MPS fallback before importing torch
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 import torch
 from transformers import (
     TrainingArguments,
@@ -11,25 +16,30 @@ from transformers import (
     EarlyStoppingCallback,
 )
 from argparse import ArgumentParser
-from segpeft import kvasir_dataset, compute_metrics, mask2former, set_seed, Metrics
+from segpeft import kvasir_dataset, mask2former, set_seed, Metrics
+from segpeft.metrics import compute_metrics
 import time
 import yaml
 import pandas as pd
 
 
 def main(epochs, lr, save_dir):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Force CPU usage to avoid MPS compatibility issues with grid_sampler_2d_backward
+    device = torch.device("cpu")
     print(f"Using device: {device}")
 
     test_size = 0.2
     model, model_name, _ = mask2former()
     train_dataset, test_dataset = kvasir_dataset(model_name, test_size)
+    N = 2
 
     training_args = TrainingArguments(
         output_dir="./outputs/" + save_dir,
         num_train_epochs=epochs,
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
+        logging_steps=N,
         learning_rate=lr,
         save_total_limit=2,
         prediction_loss_only=False,
@@ -42,12 +52,16 @@ def main(epochs, lr, save_dir):
         logging_dir=f"./outputs/{save_dir}/logs",
     )
 
+    # Create a wrapper function that includes the model name
+    def compute_metrics_wrapper(eval_pred):
+        return compute_metrics(model_name, eval_pred)
+
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=train_dataset[:2],
-        eval_dataset=test_dataset[:2],
-        compute_metrics=compute_metrics,  # type: ignore
+        train_dataset=train_dataset[:1],
+        eval_dataset=test_dataset[:1],
+        compute_metrics=compute_metrics_wrapper,  # type: ignore
         callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],
     )
 
@@ -57,11 +71,16 @@ def main(epochs, lr, save_dir):
     end_time = time.time() - start_time
 
     log = trainer.state.log_history.copy()
-    final_train_metrics = trainer.evaluate(eval_dataset=train_dataset)
+
+    # Evaluate on a very small subset to avoid memory issues
+    small_train_subset = train_dataset[:1]
+    final_train_metrics = trainer.evaluate(eval_dataset=small_train_subset)
     log.append({"epoch": epochs, "loss": final_train_metrics["eval_loss"]})
     all_metrics = {
         "training_history": log,
-        "final_evaluation": trainer.evaluate(),
+        "final_evaluation": trainer.evaluate(
+            eval_dataset=test_dataset[:1]
+        ),  # Small subset to avoid memory issues
         "training_time": end_time,
     }
     metrics = Metrics(f"./outputs/{save_dir}/")
@@ -73,10 +92,10 @@ def main(epochs, lr, save_dir):
 
 if __name__ == "__main__":
     ap = ArgumentParser()
-    ap.add_argument("--epochs", default=30)
-    ap.add_argument("--lr", default=5e-5)
-    ap.add_argument("--save-dir")
-    ap.add_argument("--seed", default=42)
+    ap.add_argument("--epochs", type=int, default=30)
+    ap.add_argument("--lr", type=float, default=5e-5)
+    ap.add_argument("--save-dir", type=str, required=True)
+    ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
     set_seed(args.seed)
