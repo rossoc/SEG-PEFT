@@ -225,42 +225,50 @@ def create_plots(metrics_dict: Dict):
     if best_lora_folder and baseline_results:
         fig, ax = plt.subplots(figsize=(12, 8))
 
-        # Plot best LoRA model losses
+        # Plot best LoRA model losses with same color
         best_lora_metrics = lora_results[best_lora_folder]["metrics"]
 
         # For training loss, we need to determine x-axis (epochs)
         epochs_train_lora = list(range(len(best_lora_metrics["train_loss"])))
         epochs_eval_lora = list(range(len(best_lora_metrics["eval_loss"])))
 
+        # Define a color for LoRA (using a distinct color)
+        lora_color = 'blue'
         ax.plot(
             epochs_train_lora,
             best_lora_metrics["train_loss"],
             label=f"Best LoRA Train (r={lora_results[best_lora_folder]['rank']}, a={lora_results[best_lora_folder]['alpha']})",
             linestyle="--",
+            color=lora_color
         )
         ax.plot(
             epochs_eval_lora,
             best_lora_metrics["eval_loss"],
             label=f"Best LoRA Eval (r={lora_results[best_lora_folder]['rank']}, a={lora_results[best_lora_folder]['alpha']})",
             linestyle="-",
+            color=lora_color
         )
 
-        # Plot baseline (full fine-tuning) losses
+        # Plot baseline (full fine-tuning) losses with same color
         for folder_name, metrics in baseline_results.items():
             epochs_train_baseline = list(range(len(metrics["train_loss"])))
             epochs_eval_baseline = list(range(len(metrics["eval_loss"])))
 
+            # Define a color for full fine-tuning (using a different distinct color)
+            fft_color = 'red'
             ax.plot(
                 epochs_train_baseline,
                 metrics["train_loss"],
                 label=f"Full Fine-tuning Train ({folder_name})",
                 linestyle="--",
+                color=fft_color
             )
             ax.plot(
                 epochs_eval_baseline,
                 metrics["eval_loss"],
                 label=f"Full Fine-tuning Eval ({folder_name})",
                 linestyle="-",
+                color=fft_color
             )
 
         ax.set_xlabel("Epochs", fontsize=14)
